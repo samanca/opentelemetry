@@ -7,8 +7,10 @@ LDFLAGS=-L/home/ubuntu/opentelemetry-cpp/install/lib
 LDFLAGS+=-lopentelemetry_resources
 LDFLAGS+=-lopentelemetry_trace
 LDFLAGS+=-lopentelemetry_common
-LDFLAGS+=-lopentelemetry_exporter_ostream_span
-LDFLAGS+=-lpthread
+#LDFLAGS+=-lopentelemetry_exporter_ostream_span
+LDFLAGS+=-lopentelemetry_exporter_zipkin_trace
+LDFLAGS+=-lhttp_client_curl
+LDFLAGS+=-lpthread -lcurl
 TARGET=test
 
 $(TARGET): Makefile test.cpp
