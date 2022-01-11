@@ -7,7 +7,8 @@
 #include <thread>
 #include <vector>
 
-#include "opentelemetry/exporters/ostream/span_exporter.h"
+#include "opentelemetry/exporters/zipkin/zipkin_exporter.h"
+//#include "opentelemetry/exporters/ostream/span_exporter.h"
 #include "opentelemetry/sdk/trace/simple_processor.h"
 #include "opentelemetry/sdk/trace/tracer_provider.h"
 #include "opentelemetry/trace/provider.h"
@@ -15,6 +16,8 @@
 namespace trace_api = opentelemetry::trace;
 namespace trace_sdk = opentelemetry::sdk::trace;
 namespace nostd = opentelemetry::nostd;
+namespace zipkin = opentelemetry::exporter::zipkin;
+namespace resource = opentelemetry::sdk::resource;
 
 namespace {
 class Logger {
@@ -61,10 +64,11 @@ class Worker : public std::enable_shared_from_this<Worker> {
 		auto provider = trace_api::Provider::GetTracerProvider();
 		auto tracer = provider->GetTracer("My tracer");
 
-		auto rootSpan = tracer->StartSpan("Root");
+		auto rootSpan = trace_api::Scope(tracer->StartSpan("Root"));
 		_logger->log("Started running");
 		while (_running) {
-			auto loopSpan = tracer->StartSpan("Loop");
+			auto loopSpan =
+			    trace_api::Scope(tracer->StartSpan("Loop"));
 			std::this_thread::sleep_for(kSleepDuration);
 		}
 		_logger->log("Finished running");
@@ -78,9 +82,16 @@ class Worker : public std::enable_shared_from_this<Worker> {
 	std::atomic<bool> _running{true};
 };
 
-void initTracer() {
+void initTracer(zipkin::ZipkinExporterOptions opts) {
+	/*
 	auto exporter = std::unique_ptr<trace_sdk::SpanExporter>(
 	    new opentelemetry::exporter::trace::OStreamSpanExporter);
+	    */
+	resource::ResourceAttributes attributes = {
+	    {"service.name", "demo service"}};
+	auto resource = resource::Resource::Create(attributes);
+	auto exporter = std::unique_ptr<trace_sdk::SpanExporter>(
+	    new zipkin::ZipkinExporter(opts));
 	auto processor = std::unique_ptr<trace_sdk::SpanProcessor>(
 	    new trace_sdk::SimpleSpanProcessor(std::move(exporter)));
 	auto provider = nostd::shared_ptr<trace_api::TracerProvider>(
@@ -93,10 +104,11 @@ void initTracer() {
 
 int main() {
 	// Setup the tracer
-	initTracer();
+	zipkin::ZipkinExporterOptions opts;
+	initTracer(std::move(opts));
 
 	const auto kWorkers = 8;
-	const auto kTestDuration = std::chrono::seconds(5);
+	const auto kTestDuration = std::chrono::seconds(30);
 
 	auto logger = std::make_shared<Logger>();
 
